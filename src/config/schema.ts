@@ -31,11 +31,26 @@ export const ConfigSchema = z.object({
   // Partner mode
   partnerMode: z.boolean().default(false),
 
+  // Transport mode
+  transport: z
+    .enum(["stdio", "http"])
+    .default("stdio"),
+  httpPort: z.number().int().positive().default(3000),
+  httpHost: z.string().default("127.0.0.1"),
+
+  // API key authentication for HTTP transport
+  mcpApiKey: z.string().optional(),
+
+  // Entra ID / OAuth authentication for HTTP transport
+  entraIdTenantId: z.string().optional(),
+  entraIdClientId: z.string().optional(),
+  entraIdAudience: z.string().optional(),
+
   // Webhook configuration
   webhookSecret: z.string().optional(),
   webhookPort: z.number().int().positive().default(3100),
 
-  // Microsoft Teams integration (future)
+  // Microsoft Teams integration
   microsoftTeamsWebhookUrl: z.string().url().optional(),
   microsoftBridgeEnabled: z.boolean().default(false),
 });

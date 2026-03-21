@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] Microsoft Integration
+
+### Added
+
+- **Streamable HTTP transport**: Dual mode server supporting both stdio (local)
+  and HTTP (cloud) transports via `MCP_TRANSPORT` setting
+- **Copilot Studio support**: Server is directly connectable to Microsoft
+  Copilot Studio agents via the MCP integration wizard
+- **API key authentication**: `MCP_API_KEY` environment variable for HTTP
+  transport security via Bearer token or X-API-Key header
+- **Entra ID authentication**: Microsoft Entra ID (Azure AD) JWT validation
+  for enterprise deployments via `ENTRA_ID_TENANT_ID` configuration
+- **Adaptive Cards v1.5**: Replaced deprecated MessageCard format with
+  Adaptive Cards supporting icons, FactSets, and severity color coding
+- **Specialized card templates**: Purpose built Adaptive Cards for menu
+  changes, order threshold alerts, and health check notifications
+- **Power Automate webhook delivery**: Replaces deprecated incoming
+  webhooks (sunset April 2026) with workflow webhook format
+- **Dockerfile**: Multi stage build for Azure Container Apps deployment
+- **Health endpoint**: `/health` endpoint for container orchestration
+- **Session management**: Streamable HTTP sessions with automatic cleanup
+
+### Documentation
+
+- Copilot Studio connection guide (docs/copilot-studio.md)
+- Cloud deployment guide for Azure Container Apps and App Service (docs/deployment.md)
+- Teams SDK bot example with McpClientPlugin architecture
+- Updated roadmap reflecting Microsoft integration phases
+
 ## [0.1.0] Initial Release
 
 ### Added

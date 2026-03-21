@@ -10,7 +10,7 @@ async function main(): Promise<void> {
     logger.setLevel(config.logLevel);
 
     logger.info("Toast MCP Server starting", {
-      version: "0.1.0",
+      version: "0.2.0",
       apiHost: config.toastApiHost,
       restaurants: config.toastRestaurantGuids.length,
       writesEnabled: config.allowWrites,

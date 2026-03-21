@@ -1,22 +1,28 @@
 import { logger } from "../utils/index.js";
 import type { ToastEvent } from "../events/index.js";
 import type { NotificationBridge, BridgeMessage } from "./types.js";
-
-const SEVERITY_COLORS: Record<string, string> = {
-  info: "0076D7",
-  warning: "FFA500",
-  critical: "FF0000",
-};
+import {
+  buildTeamsWebhookPayload,
+  buildMenuChangeCard,
+  buildOrderThresholdCard,
+  buildHealthAlertCard,
+} from "./adaptive-cards.js";
 
 /**
- * Microsoft Teams notification bridge using incoming webhooks.
+ * Microsoft Teams notification bridge.
  *
- * This is a foundation for future Teams integration. It transforms
- * Toast events into Teams webhook card payloads and delivers them.
+ * Sends Toast events to Teams channels via Power Automate workflow
+ * webhooks using Adaptive Cards v1.5. This replaces the deprecated
+ * Office 365 Connector / incoming webhook approach (sunset April 2026).
  *
- * TODO: Support Adaptive Cards format for richer interactivity
- * TODO: Support Teams Bot Framework for bidirectional communication
- * TODO: Support Power Automate / Work IQ triggers
+ * Setup:
+ * 1. In Teams, create a Power Automate workflow triggered by
+ *    "When a Teams webhook request is received"
+ * 2. Add "Post adaptive card in a chat or channel" as the action
+ * 3. Copy the workflow URL to MICROSOFT_TEAMS_WEBHOOK_URL
+ *
+ * For specialized cards (menu changes, order alerts, health checks),
+ * the bridge selects a purpose built Adaptive Card template.
  */
 export class TeamsBridge implements NotificationBridge {
   readonly name = "microsoft-teams";
@@ -53,13 +59,13 @@ export class TeamsBridge implements NotificationBridge {
       return;
     }
 
-    const card = this.buildTeamsCard(message);
+    const payload = buildTeamsWebhookPayload(message);
 
     try {
       const response = await fetch(this.webhookUrl!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(card),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -82,27 +88,91 @@ export class TeamsBridge implements NotificationBridge {
   }
 
   /**
-   * Build a MessageCard payload for Teams incoming webhook.
-   * Uses the legacy MessageCard format for broad compatibility.
+   * Send a specialized card for specific event types.
+   * Falls back to the generic Adaptive Card for unrecognized types.
    */
-  private buildTeamsCard(
-    message: BridgeMessage
-  ): Record<string, unknown> {
-    return {
-      "@type": "MessageCard",
-      "@context": "https://schema.org/extensions",
-      themeColor: SEVERITY_COLORS[message.severity] ?? "0076D7",
-      summary: message.title,
-      sections: [
-        {
-          activityTitle: message.title,
-          activitySubtitle: `Event: ${message.sourceEventId}`,
-          text: message.body,
-          facts: message.facts ?? [],
-          markdown: true,
-        },
-      ],
-    };
+  async sendEvent(event: ToastEvent): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    let payload: Record<string, unknown>;
+
+    // Use specialized card templates for known event types
+    switch (event.type) {
+      case "menu.changed": {
+        const card = buildMenuChangeCard(event);
+        payload = {
+          type: "message",
+          attachments: [
+            {
+              contentType: "application/vnd.microsoft.card.adaptive",
+              contentUrl: null,
+              content: card,
+            },
+          ],
+        };
+        break;
+      }
+      case "order.threshold_alert": {
+        const card = buildOrderThresholdCard(event);
+        payload = {
+          type: "message",
+          attachments: [
+            {
+              contentType: "application/vnd.microsoft.card.adaptive",
+              contentUrl: null,
+              content: card,
+            },
+          ],
+        };
+        break;
+      }
+      case "health.check_failed":
+      case "health.check_recovered": {
+        const card = buildHealthAlertCard(event);
+        payload = {
+          type: "message",
+          attachments: [
+            {
+              contentType: "application/vnd.microsoft.card.adaptive",
+              contentUrl: null,
+              content: card,
+            },
+          ],
+        };
+        break;
+      }
+      default: {
+        const message = this.formatMessage(event);
+        payload = buildTeamsWebhookPayload(message);
+      }
+    }
+
+    try {
+      const response = await fetch(this.webhookUrl!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        logger.error("Teams event delivery failed", {
+          status: response.status,
+          type: event.type,
+          eventId: event.id,
+        });
+      } else {
+        logger.info("Teams event notification sent", {
+          type: event.type,
+          eventId: event.id,
+        });
+      }
+    } catch (error) {
+      logger.error("Teams event delivery error", {
+        error: error instanceof Error ? error.message : String(error),
+        type: event.type,
+        eventId: event.id,
+      });
+    }
   }
 
   private formatTitle(event: ToastEvent): string {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition } from "../registry.js";
 import { jsonResult, textResult } from "../registry.js";
 import type { Menu, MenuSearchResult } from "../../models/index.js";
+import { extractMenus, getGroups } from "./menu.js";
 
 /**
  * Search through menus client-side since Toast does not provide
@@ -39,9 +40,10 @@ export const searchMenuItemsTool: ToolDefinition = {
       };
     }
 
-    const menus = await client.get<Menu[]>("/menus/v2/menus", undefined, guid);
+    const raw = await client.get<unknown>("/menus/v2/menus", undefined, guid);
+    const menus = extractMenus(raw);
 
-    if (!Array.isArray(menus) || menus.length === 0) {
+    if (menus.length === 0) {
       return textResult("No menus found for this restaurant.");
     }
 
@@ -51,7 +53,7 @@ export const searchMenuItemsTool: ToolDefinition = {
 
     for (const menu of menus) {
       if (results.length >= maxResults) break;
-      searchGroups(menu.groups ?? [], menu.name, query, results, maxResults);
+      searchGroups(getGroups(menu), menu.name, query, results, maxResults);
     }
 
     if (results.length === 0) {

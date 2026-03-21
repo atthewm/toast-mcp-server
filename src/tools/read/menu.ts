@@ -3,6 +3,31 @@ import type { ToolDefinition } from "../registry.js";
 import { jsonResult } from "../registry.js";
 import type { Menu, MenuMetadata } from "../../models/index.js";
 
+/**
+ * Toast menus API returns { menus: [...] } not a flat array.
+ */
+interface MenusResponse {
+  menus?: Menu[];
+  // Flat array fallback
+  [key: string]: unknown;
+}
+
+function extractMenus(data: unknown): Menu[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object" && "menus" in data) {
+    const resp = data as MenusResponse;
+    if (Array.isArray(resp.menus)) return resp.menus;
+  }
+  return [];
+}
+
+/**
+ * Menu groups may be nested under "groups" or "menuGroups".
+ */
+function getGroups(menu: Menu): Menu["groups"] {
+  return menu.groups ?? (menu as unknown as Record<string, unknown>).menuGroups as Menu["groups"] ?? [];
+}
+
 export const menuMetadataTool: ToolDefinition = {
   name: "toast_get_menu_metadata",
   description:
@@ -29,21 +54,21 @@ export const menuMetadataTool: ToolDefinition = {
       };
     }
 
-    const menus = await client.get<Menu[]>(
+    const raw = await client.get<unknown>(
       "/menus/v2/menus",
       undefined,
       guid
     );
 
+    const menus = extractMenus(raw);
+
     const metadata: MenuMetadata = {
-      menuCount: Array.isArray(menus) ? menus.length : 0,
-      menus: Array.isArray(menus)
-        ? menus.map((m) => ({
-            guid: m.guid,
-            name: m.name,
-            groupCount: m.groups?.length ?? 0,
-          }))
-        : [],
+      menuCount: menus.length,
+      menus: menus.map((m) => ({
+        guid: m.guid,
+        name: m.name,
+        groupCount: getGroups(m).length,
+      })),
     };
 
     return jsonResult(metadata);
@@ -86,8 +111,15 @@ export const getMenuTool: ToolDefinition = {
       ? `/menus/v2/menus/${input.menuGuid}`
       : "/menus/v2/menus";
 
-    const result = await client.get<Menu | Menu[]>(path, undefined, guid);
+    const raw = await client.get<unknown>(path, undefined, guid);
 
-    return jsonResult(result);
+    // Return extracted menus for the list endpoint, raw for single menu
+    if (input.menuGuid) {
+      return jsonResult(raw);
+    }
+
+    return jsonResult(extractMenus(raw));
   },
 };
+
+export { extractMenus, getGroups };

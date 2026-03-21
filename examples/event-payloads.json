@@ -1,0 +1,54 @@
+{
+  "description": "Example normalized event payloads for the Toast MCP server event system. These represent the event envelope format that downstream consumers (Teams bridge, alerting, etc.) will receive.",
+  "events": [
+    {
+      "id": "evt_abc123",
+      "type": "menu.changed",
+      "severity": "info",
+      "timestamp": "2026-03-21T14:30:00.000Z",
+      "restaurantGuid": "c227349d-7778-4ec2-af27-e386eb2ec52e",
+      "summary": "Menu updated: 2 menus changed",
+      "payload": {
+        "previousMenuCount": 3,
+        "currentMenuCount": 3,
+        "changedMenuGuids": ["menu-guid-1", "menu-guid-2"]
+      },
+      "source": "poll"
+    },
+    {
+      "id": "evt_def456",
+      "type": "order.threshold_alert",
+      "severity": "warning",
+      "timestamp": "2026-03-21T12:00:00.000Z",
+      "restaurantGuid": "c227349d-7778-4ec2-af27-e386eb2ec52e",
+      "summary": "Order volume above threshold: 150 orders in last hour (threshold: 100)",
+      "payload": {
+        "period": "1h",
+        "orderCount": 150,
+        "threshold": 100,
+        "direction": "above"
+      },
+      "source": "poll"
+    },
+    {
+      "id": "evt_ghi789",
+      "type": "health.check_failed",
+      "severity": "critical",
+      "timestamp": "2026-03-21T08:15:00.000Z",
+      "restaurantGuid": "c227349d-7778-4ec2-af27-e386eb2ec52e",
+      "summary": "Toast API health check failed: authentication error",
+      "payload": {},
+      "source": "internal"
+    },
+    {
+      "id": "evt_jkl012",
+      "type": "restaurant.connected",
+      "severity": "info",
+      "timestamp": "2026-03-21T09:00:00.000Z",
+      "restaurantGuid": "new-location-guid",
+      "summary": "New restaurant connected: Downtown Location",
+      "payload": {},
+      "source": "webhook"
+    }
+  ]
+}

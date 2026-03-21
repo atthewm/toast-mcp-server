@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "toast": {
+      "command": "node",
+      "args": ["/path/to/toast-mcp-server/dist/index.js"],
+      "env": {
+        "TOAST_CLIENT_ID": "your_client_id",
+        "TOAST_CLIENT_SECRET": "your_client_secret",
+        "TOAST_RESTAURANT_GUID": "your_restaurant_guid",
+        "ALLOW_WRITES": "false",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}

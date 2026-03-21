@@ -28,6 +28,20 @@ function getGroups(menu: Menu): Menu["groups"] {
   return menu.groups ?? (menu as unknown as Record<string, unknown>).menuGroups as Menu["groups"] ?? [];
 }
 
+/**
+ * Group items may be under "items" or "menuItems".
+ */
+function getItems(group: Record<string, unknown>): Menu["groups"][0]["items"] {
+  return (group.items ?? group.menuItems ?? []) as Menu["groups"][0]["items"];
+}
+
+/**
+ * Subgroups may be under "subgroups" or "menuGroups".
+ */
+function getSubgroups(group: Record<string, unknown>): Menu["groups"] {
+  return (group.subgroups ?? group.menuGroups ?? []) as Menu["groups"];
+}
+
 export const menuMetadataTool: ToolDefinition = {
   name: "toast_get_menu_metadata",
   description:
@@ -122,4 +136,4 @@ export const getMenuTool: ToolDefinition = {
   },
 };
 
-export { extractMenus, getGroups };
+export { extractMenus, getGroups, getItems, getSubgroups };

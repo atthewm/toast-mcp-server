@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition } from "../registry.js";
 import { jsonResult, textResult } from "../registry.js";
 import type { Menu, MenuSearchResult } from "../../models/index.js";
-import { extractMenus, getGroups } from "./menu.js";
+import { extractMenus, getGroups, getItems, getSubgroups } from "./menu.js";
 
 /**
  * Search through menus client-side since Toast does not provide
@@ -78,61 +78,32 @@ function searchGroups(
   for (const group of groups) {
     if (results.length >= maxResults) return;
 
-    // Search items in this group
-    for (const item of group.items ?? []) {
+    // Get items using flexible field names (items or menuItems)
+    const items = getItems(group as unknown as Record<string, unknown>);
+
+    for (const item of items ?? []) {
       if (results.length >= maxResults) return;
 
-      // Match on item name
       if (item.name?.toLowerCase().includes(query)) {
-        results.push({
-          item,
-          menuName,
-          groupName: group.name,
-          matchField: "name",
-        });
+        results.push({ item, menuName, groupName: group.name, matchField: "name" });
         continue;
       }
 
-      // Match on item description
       if (item.description?.toLowerCase().includes(query)) {
-        results.push({
-          item,
-          menuName,
-          groupName: group.name,
-          matchField: "description",
-        });
+        results.push({ item, menuName, groupName: group.name, matchField: "description" });
         continue;
       }
 
-      // Match on group name
       if (group.name?.toLowerCase().includes(query)) {
-        results.push({
-          item,
-          menuName,
-          groupName: group.name,
-          matchField: "group",
-        });
+        results.push({ item, menuName, groupName: group.name, matchField: "group" });
         continue;
-      }
-
-      // Match on modifier names
-      const matchingMod = item.modifierGroups
-        ?.flatMap((mg) => mg.modifiers ?? [])
-        .find((mod) => mod.name?.toLowerCase().includes(query));
-
-      if (matchingMod) {
-        results.push({
-          item,
-          menuName,
-          groupName: group.name,
-          matchField: `modifier:${matchingMod.name}`,
-        });
       }
     }
 
-    // Recurse into subgroups
-    if (group.subgroups) {
-      searchGroups(group.subgroups, menuName, query, results, maxResults);
+    // Recurse into subgroups (subgroups or menuGroups)
+    const subgroups = getSubgroups(group as unknown as Record<string, unknown>);
+    if (subgroups && subgroups.length > 0) {
+      searchGroups(subgroups, menuName, query, results, maxResults);
     }
   }
 }

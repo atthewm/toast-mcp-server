@@ -83,7 +83,7 @@ describe("ToastClient", () => {
       const [, options] = spy.mock.calls[1];
       const headers = options?.headers as Record<string, string>;
       expect(headers["Authorization"]).toBe(
-        `Bearer ${mockTokenResponse.accessToken}`
+        `Bearer ${mockTokenResponse.token.accessToken}`
       );
     });
 

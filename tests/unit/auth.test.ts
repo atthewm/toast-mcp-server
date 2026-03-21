@@ -95,10 +95,13 @@ describe("ToastAuth", () => {
   describe("token refresh on expiry", () => {
     it("should re-acquire a token when the cached one has expired", async () => {
       const fetchSpy = mockFetchSuccess({
-        ...mockTokenResponse,
-        // Set expiresIn to 0 so the token expires immediately
-        // (the 60 second buffer means it will be considered expired)
-        expiresIn: 30,
+        token: {
+          ...mockTokenResponse.token,
+          // Set expiresIn to 30 so the token expires immediately
+          // (the 60 second buffer means it will be considered expired)
+          expiresIn: 30,
+        },
+        status: "SUCCESS",
       });
 
       await auth.getToken();

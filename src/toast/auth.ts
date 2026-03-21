@@ -1,9 +1,17 @@
 import { logger, AuthenticationError } from "../utils/index.js";
 
 interface TokenResponse {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
+  // Toast wraps the token in a nested object
+  token?: {
+    accessToken: string;
+    tokenType: string;
+    expiresIn: number;
+  };
+  // Also support flat format (some endpoints/versions)
+  accessToken?: string;
+  tokenType?: string;
+  expiresIn?: number;
+  status?: string;
 }
 
 interface CachedToken {
@@ -76,22 +84,32 @@ export class ToastAuth {
 
     const data = (await response.json()) as TokenResponse;
 
-    if (!data.accessToken) {
+    // Handle both nested (real API) and flat response formats
+    const accessToken = data.token?.accessToken ?? data.accessToken;
+    const expiresIn = data.token?.expiresIn ?? data.expiresIn;
+
+    if (!accessToken) {
       throw new AuthenticationError(
         "Toast auth response missing accessToken field"
       );
     }
 
+    if (!expiresIn) {
+      throw new AuthenticationError(
+        "Toast auth response missing expiresIn field"
+      );
+    }
+
     this.cachedToken = {
-      accessToken: data.accessToken,
+      accessToken,
       expiresAt:
         Date.now() +
-        data.expiresIn * 1000 -
+        expiresIn * 1000 -
         ToastAuth.TOKEN_REFRESH_BUFFER_MS,
     };
 
     logger.info("Toast auth token acquired", {
-      expiresIn: data.expiresIn,
+      expiresIn,
     });
 
     return this.cachedToken.accessToken;

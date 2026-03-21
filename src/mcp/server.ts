@@ -29,13 +29,15 @@ import {
 } from "../tools/index.js";
 
 /**
- * Create and configure the MCP server with all tools registered.
+ * Shared state that persists across sessions (client, events, config).
  */
-export function createServer(config: Config): {
-  server: McpServer;
+interface ServerContext {
   client: ToastClient;
   events: EventEmitter;
-} {
+  config: Config;
+}
+
+function createContext(config: Config): ServerContext {
   const client = new ToastClient(config);
   const events = new EventEmitter();
 
@@ -53,10 +55,29 @@ export function createServer(config: Config): {
     logger.info("Teams bridge enabled for event forwarding");
   }
 
-  // Register tools into our internal registry (handles write gating)
+  return { client, events, config };
+}
+
+/**
+ * Create a new McpServer instance with all tools registered.
+ * Each transport connection needs its own McpServer instance.
+ */
+export function createServer(config: Config): {
+  server: McpServer;
+  client: ToastClient;
+  events: EventEmitter;
+} {
+  const ctx = createContext(config);
+  const server = buildMcpServer(ctx);
+  return { server, client: ctx.client, events: ctx.events };
+}
+
+function buildMcpServer(ctx: ServerContext): McpServer {
+  const { config, client } = ctx;
+
+  // Register tools
   const registry = new ToolRegistry(config);
 
-  // Read tools (always available)
   registry.register(authStatusTool);
   registry.register(listRestaurantsTool);
   registry.register(restaurantInfoTool);
@@ -68,8 +89,6 @@ export function createServer(config: Config): {
   registry.register(listOrdersTool);
   registry.register(healthcheckTool);
   registry.register(capabilitiesTool);
-
-  // Write tools (gated by ALLOW_WRITES)
   registry.register(priceOrderTool);
   registry.register(createOrderTool);
   registry.register(updateOrderTool);
@@ -78,7 +97,6 @@ export function createServer(config: Config): {
     writesEnabled: config.allowWrites,
   });
 
-  // Create MCP server
   const server = new McpServer({
     name: "toast-mcp-server",
     version: "0.2.0",
@@ -86,7 +104,6 @@ export function createServer(config: Config): {
 
   const context: ToolContext = { client, config };
 
-  // Register each tool with the MCP server by passing the Zod shape directly
   for (const def of registry.getDefinitions()) {
     const shape = def.inputSchema.shape;
     const toolName = def.name;
@@ -101,7 +118,7 @@ export function createServer(config: Config): {
     );
   }
 
-  return { server, client, events };
+  return server;
 }
 
 /**
@@ -118,72 +135,75 @@ export async function startStdioServer(config: Config): Promise<void> {
 /**
  * Start the MCP server using Streamable HTTP transport.
  * Required for Copilot Studio, Teams SDK, and cloud deployments.
+ *
+ * Each new session gets its own McpServer instance since the SDK
+ * only allows one transport per server. The Toast client and config
+ * are shared across all sessions.
  */
 export async function startHttpServer(config: Config): Promise<void> {
-  const { server } = createServer(config);
+  const ctx = createContext(config);
 
   const app = express();
-  app.use(express.json());
 
-  // Auth middleware for all /mcp routes
   const authMiddleware = createAuthMiddleware(config);
 
-  // Health endpoint (no auth required)
+  // Health endpoint (no auth, needs JSON parsing)
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", version: "0.2.0" });
   });
 
-  // Map of active transports by session ID
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+  // Active sessions: transport + server per session
+  const sessions = new Map<
+    string,
+    { transport: StreamableHTTPServerTransport; server: McpServer }
+  >();
 
-  // MCP endpoint: handles POST (messages) and GET (SSE streams)
+  // MCP endpoint
   app.all("/mcp", authMiddleware, async (req, res) => {
-    // Check for existing session
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    if (sessionId && transports.has(sessionId)) {
-      // Existing session: route to the existing transport
-      const transport = transports.get(sessionId)!;
-      await transport.handleRequest(req, res);
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
+      await session.transport.handleRequest(req, res);
       return;
     }
 
-    if (sessionId && !transports.has(sessionId)) {
-      // Unknown session ID
+    if (sessionId && !sessions.has(sessionId)) {
       res.status(404).json({ error: "Session not found" });
       return;
     }
 
-    // New session: create a new transport
+    // New session
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
     });
 
+    const server = buildMcpServer(ctx);
+
     transport.onclose = () => {
       if (transport.sessionId) {
-        transports.delete(transport.sessionId);
+        sessions.delete(transport.sessionId);
         logger.debug("Session closed", { sessionId: transport.sessionId });
       }
     };
 
-    // Connect the MCP server to this transport
     await server.connect(transport);
+    await transport.handleRequest(req, res);
 
+    // Session ID is set after handleRequest processes the initialize request
     if (transport.sessionId) {
-      transports.set(transport.sessionId, transport);
+      sessions.set(transport.sessionId, { transport, server });
       logger.debug("New session created", { sessionId: transport.sessionId });
     }
-
-    await transport.handleRequest(req, res);
   });
 
-  // DELETE endpoint for session cleanup
+  // Session cleanup
   app.delete("/mcp", authMiddleware, async (req, res) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!;
-      await transport.close();
-      transports.delete(sessionId);
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
+      await session.transport.close();
+      sessions.delete(sessionId);
       res.status(200).json({ status: "session closed" });
     } else {
       res.status(404).json({ error: "Session not found" });

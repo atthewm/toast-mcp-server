@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConfigSchema } from "../../src/config/schema.js";
 import { loadConfig } from "../../src/config/loader.js";
 
@@ -243,20 +243,21 @@ describe("loadConfig", () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    // Clear relevant env vars before each test
-    delete process.env.TOAST_CLIENT_ID;
-    delete process.env.TOAST_CLIENT_SECRET;
-    delete process.env.TOAST_RESTAURANT_GUID;
-    delete process.env.TOAST_RESTAURANT_GUIDS;
-    delete process.env.TOAST_API_HOST;
-    delete process.env.ALLOW_WRITES;
-    delete process.env.DRY_RUN;
-    delete process.env.LOG_LEVEL;
-    delete process.env.PARTNER_MODE;
-    delete process.env.WEBHOOK_SECRET;
-    delete process.env.WEBHOOK_PORT;
-    delete process.env.MICROSOFT_TEAMS_WEBHOOK_URL;
-    delete process.env.MICROSOFT_BRIDGE_ENABLED;
+    // Clear ALL relevant env vars before each test (including ones .env may set)
+    const keysToDelete = [
+      "TOAST_CLIENT_ID", "TOAST_CLIENT_SECRET",
+      "TOAST_RESTAURANT_GUID", "TOAST_RESTAURANT_GUIDS",
+      "TOAST_API_HOST", "ALLOW_WRITES", "DRY_RUN",
+      "LOG_LEVEL", "PARTNER_MODE", "WEBHOOK_SECRET", "WEBHOOK_PORT",
+      "MICROSOFT_TEAMS_WEBHOOK_URL", "MICROSOFT_BRIDGE_ENABLED",
+      "MCP_TRANSPORT", "MCP_HTTP_PORT", "MCP_HTTP_HOST",
+      "MCP_API_KEY", "ENTRA_ID_TENANT_ID", "ENTRA_ID_CLIENT_ID", "ENTRA_ID_AUDIENCE",
+    ];
+    for (const key of keysToDelete) {
+      delete process.env[key];
+    }
+    // Prevent .env file from being loaded during tests
+    vi.spyOn(process, "cwd").mockReturnValue("/tmp/nonexistent-dir-for-tests");
   });
 
   afterEach(() => {

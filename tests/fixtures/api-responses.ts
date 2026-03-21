@@ -265,9 +265,12 @@ export const mockOrder: Order = {
 // ==================== Auth Token Response ====================
 
 export const mockTokenResponse = {
-  accessToken: "mock-access-token-abc123",
-  tokenType: "Bearer",
-  expiresIn: 3600,
+  token: {
+    accessToken: "mock-access-token-abc123",
+    tokenType: "Bearer",
+    expiresIn: 3600,
+  },
+  status: "SUCCESS",
 };
 
 // ==================== Config Helpers ====================

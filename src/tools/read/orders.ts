@@ -81,6 +81,41 @@ export const listOrdersTool: ToolDefinition = {
       params.businessDate = input.businessDate;
     }
 
+    // Fetch dining options config to resolve GUIDs to names
+    const diningOptionNames = new Map<string, string>();
+    try {
+      const diningOptions = await client.get<
+        Array<{ guid: string; name: string }>
+      >("/config/v2/diningOptions", undefined, guid);
+      if (Array.isArray(diningOptions)) {
+        for (const opt of diningOptions) {
+          if (opt.guid && opt.name) {
+            diningOptionNames.set(opt.guid, opt.name);
+          }
+        }
+      }
+    } catch {
+      // Config fetch failed, names will be undefined
+    }
+
+    // Fetch employee names to resolve server GUIDs
+    const employeeNames = new Map<string, string>();
+    try {
+      const employees = await client.get<
+        Array<{ guid: string; firstName?: string; lastName?: string }>
+      >("/labor/v1/employees", undefined, guid);
+      if (Array.isArray(employees)) {
+        for (const emp of employees) {
+          if (emp.guid) {
+            const name = [emp.firstName, emp.lastName].filter(Boolean).join(" ");
+            if (name) employeeNames.set(emp.guid, name);
+          }
+        }
+      }
+    } catch {
+      // Labor fetch failed, server names will be undefined
+    }
+
     // The list endpoint returns an array of GUID strings
     const orderGuids = await client.get<string[]>(
       "/orders/v2/orders",
@@ -129,16 +164,22 @@ export const listOrdersTool: ToolDefinition = {
       );
 
       const diningOpt = o.diningOption as Record<string, unknown> | undefined;
+      const diningGuid = diningOpt?.guid as string | undefined;
       const server = o.server as Record<string, unknown> | undefined;
+      const serverGuid = server?.guid as string | undefined;
 
       return {
         guid: o.guid as string,
         displayNumber: o.displayNumber as string | undefined,
         openedDate: o.openedDate as string | undefined,
         closedDate: o.closedDate as string | undefined,
-        diningOption: diningOpt?.guid as string | undefined,
-        diningOptionName: diningOpt?.name as string | undefined,
-        serverName: server?.name as string | undefined,
+        diningOption: diningGuid,
+        diningOptionName:
+          (diningOpt?.name as string | undefined) ??
+          (diningGuid ? diningOptionNames.get(diningGuid) : undefined),
+        serverName:
+          (server?.name as string | undefined) ??
+          (serverGuid ? employeeNames.get(serverGuid) : undefined),
         source: o.source as string | undefined,
         total: orderTotal,
         itemCount: selections.length,

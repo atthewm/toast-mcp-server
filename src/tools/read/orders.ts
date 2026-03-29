@@ -41,9 +41,9 @@ export const getOrderTool: ToolDefinition = {
 export const listOrdersTool: ToolDefinition = {
   name: "toast_list_orders",
   description:
-    "List orders for a business day. Returns order count and summary details " +
-    "for each order (fetches up to 20 full order details). Use businessDate " +
-    "in YYYYMMDD format.",
+    "List orders for a business day. Returns accurate totalSales across ALL " +
+    "orders and summary details for a subset (controlled by detailCount). " +
+    "Use businessDate in YYYYMMDD format.",
   inputSchema: z.object({
     restaurantGuid: z
       .string()
@@ -60,7 +60,18 @@ export const listOrdersTool: ToolDefinition = {
       .number()
       .optional()
       .default(20)
-      .describe("Number of orders to fetch full details for. Default: 20."),
+      .describe(
+        "Number of order summaries to return in the orders array. Default: 20. " +
+          "totalSales is always computed from ALL orders regardless of this value."
+      ),
+    fetchAll: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        "When true, return ALL order summaries in the orders array " +
+          "(ignoring detailCount). totalSales is always accurate either way."
+      ),
   }),
   async execute(input, { client }) {
     const guid = input.restaurantGuid ?? client.getDefaultRestaurantGuid();
@@ -124,15 +135,15 @@ export const listOrdersTool: ToolDefinition = {
     );
 
     const guids = Array.isArray(orderGuids) ? orderGuids : [];
-    const detailCount = Math.min(input.detailCount ?? 20, 200);
+    const detailCount = Math.min(input.detailCount ?? 20, 500);
+    const returnAll = input.fetchAll ?? false;
 
-    // Fetch details for the first N orders
+    // Always fetch ALL order details so totalSales is accurate
     const orderDetails: Array<Record<string, unknown>> = [];
-    const fetchGuids = guids.slice(0, detailCount);
 
-    // Fetch in parallel batches of 5 to avoid overwhelming the API
-    for (let i = 0; i < fetchGuids.length; i += 5) {
-      const batch = fetchGuids.slice(i, i + 5);
+    // Fetch in parallel batches of 10
+    for (let i = 0; i < guids.length; i += 10) {
+      const batch = guids.slice(i, i + 10);
       const results = await Promise.all(
         batch.map((orderGuid) =>
           client
@@ -149,9 +160,9 @@ export const listOrdersTool: ToolDefinition = {
       }
     }
 
-    // Build summary
+    // Build summaries for ALL orders (needed for accurate totalSales)
     let totalSales = 0;
-    const summaries = orderDetails.map((o) => {
+    const allSummaries = orderDetails.map((o) => {
       const checks = (o.checks as Array<Record<string, unknown>>) ?? [];
       const orderTotal = checks.reduce(
         (sum, c) => sum + ((c.totalAmount as number) ?? 0),
@@ -187,11 +198,16 @@ export const listOrdersTool: ToolDefinition = {
       };
     });
 
+    // Return all summaries or just the first detailCount
+    const returnedSummaries = returnAll
+      ? allSummaries
+      : allSummaries.slice(0, detailCount);
+
     return jsonResult({
       totalOrders: guids.length,
       detailsFetched: orderDetails.length,
       totalSales: Math.round(totalSales * 100) / 100,
-      orders: summaries,
+      orders: returnedSummaries,
     });
   },
 };

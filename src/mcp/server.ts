@@ -23,6 +23,7 @@ import {
   listOrdersTool,
   healthcheckTool,
   capabilitiesTool,
+  listShiftsTool,
   priceOrderTool,
   createOrderTool,
   updateOrderTool,
@@ -89,6 +90,7 @@ function buildMcpServer(ctx: ServerContext): McpServer {
   registry.register(listOrdersTool);
   registry.register(healthcheckTool);
   registry.register(capabilitiesTool);
+  registry.register(listShiftsTool);
   registry.register(priceOrderTool);
   registry.register(createOrderTool);
   registry.register(updateOrderTool);

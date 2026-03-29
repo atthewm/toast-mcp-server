@@ -13,6 +13,7 @@ export {
   listOrdersTool,
   healthcheckTool,
   capabilitiesTool,
+  listShiftsTool,
 } from "./read/index.js";
 
 // Write tools

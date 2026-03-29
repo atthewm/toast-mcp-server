@@ -29,6 +29,7 @@ export const capabilitiesTool: ToolDefinition = {
         fullMenu: authenticated,
         menuSearch: authenticated,
         orders: authenticated,
+        labor: authenticated,
         reporting: false, // TODO: requires specific scopes
       },
       writeOperations: {

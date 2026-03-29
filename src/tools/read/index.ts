@@ -7,3 +7,4 @@ export { searchMenuItemsTool } from "./search-menu.js";
 export { getOrderTool, listOrdersTool } from "./orders.js";
 export { healthcheckTool } from "./healthcheck.js";
 export { capabilitiesTool } from "./capabilities.js";
+export { listShiftsTool } from "./labor.js";

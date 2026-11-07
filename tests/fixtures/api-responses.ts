@@ -18,8 +18,8 @@ import type {
 
 export const mockRestaurantInfo: RestaurantInfo = {
   guid: "c227349d-7778-4ec2-af27-e386eb2ec52e",
-  name: "Remote Coffee",
-  locationName: "Remote Coffee Downtown",
+  name: "Sample Cafe",
+  locationName: "Sample Cafe Downtown",
   locationCode: "RC001",
   address: {
     street1: "100 Main Street",
@@ -193,7 +193,7 @@ export const mockMenuGroups: MenuGroup[] = [
 export const mockMenu: Menu = {
   guid: "menu-main",
   name: "Main Menu",
-  description: "Remote Coffee main menu",
+  description: "Sample Cafe main menu",
   groups: mockMenuGroups,
   visibility: "ALL",
 };
